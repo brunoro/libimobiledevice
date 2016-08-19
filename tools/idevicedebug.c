@@ -31,16 +31,27 @@
 #include <unistd.h>
 #include <libgen.h>
 
-#ifdef WIN32
-#include <windows.h>
-#define sleep(x) Sleep(x*1000)
-#endif
-
 #include <libimobiledevice/installation_proxy.h>
 #include <libimobiledevice/libimobiledevice.h>
 #include <libimobiledevice/debugserver.h>
 #include <plist/plist.h>
 #include "common/debug.h"
+
+#ifdef WIN32
+#include <windows.h>
+void usleep(__int64 usec) 
+{ 
+    HANDLE timer; 
+    LARGE_INTEGER ft; 
+
+    ft.QuadPart = -(10*usec); // Convert to 100 nanosecond interval, negative value indicates relative time
+
+    timer = CreateWaitableTimer(NULL, TRUE, NULL); 
+    SetWaitableTimer(timer, &ft, 0, NULL, NULL, 0); 
+    WaitForSingleObject(timer, INFINITE); 
+    CloseHandle(timer); 
+}
+#endif
 
 enum cmd_mode {
 	CMD_NONE = 0,
@@ -454,6 +465,8 @@ int main(int argc, char *argv[])
 			/* main loop which is parsing/handling packets during the run */
 			debug_info("Entering run loop...");
 			while (!quit_flag) {
+				usleep(16666);  // roughly 60 fps
+
 				if (dres != DEBUGSERVER_E_SUCCESS) {
 					debug_info("failed to receive response");
 					break;
@@ -463,8 +476,6 @@ int main(int argc, char *argv[])
 					debug_info("response: %s", response);
 					dres = debugserver_client_handle_response(debugserver_client, &response, 1);
 				}
-
-				sleep(1);
 			}
 
 			/* kill process after we finished */
